@@ -124,7 +124,7 @@ function encrypt_uploaded_file( $details, $upload_type ) {
 	 * @return bool Whether to allow encryption or not
 	 */
 	if ( ! apply_filters( 'encrypted_uploads_should_encrypt', true, $ext_info['type'], $ext, $details['file'] ) ) {
-		$details['error'] = esc_html__( 'Could not encrypt the file, possibly because of filesystem permissions.', 'encrypted-uploads' );
+		$details['error'] = esc_html__( 'Encryption of this file has been disabled by site administrator.', 'encrypted-uploads' );
 
 		return $details;
 	}
