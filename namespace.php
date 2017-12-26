@@ -3,7 +3,7 @@
 namespace HM\EncryptedUploads;
 
 /**
- * Adds a checkbox in the upload window to encrypt the file being uploaded
+ * Add a checkbox in the upload window to encrypt the file being uploaded.
  *
  * @action post-upload-ui
  */
@@ -17,8 +17,11 @@ function post_upload_ui_encryption() {
 add_action( 'post-upload-ui', __NAMESPACE__ . '\\post_upload_ui_encryption', 10 );
 
 /**
- * Adds the Javasript handling of the encryption checkbox / params
- * Note: Needed to use a global var because the checkbox is cleared in post-edit add-media modal by that time
+ * Add the Javascript handling of the encryption checkbox / params.
+ *
+ * Note: Needed to use a global var because the checkbox is cleared in post-edit add-media modal by that time.
+ *
+ * @action wp_enqueue_media
  */
 function encrypted_footer_script() {
 	$script = <<<SCRIPT
@@ -50,11 +53,11 @@ SCRIPT;
 add_action( 'wp_enqueue_media', __NAMESPACE__ . '\\encrypted_footer_script', 99 );
 
 /**
- * Encrypt file contents via the shared cipher key
+ * Encrypt file contents via the shared cipher key.
  *
- * @param $filepath
+ * @param string $filepath Path to the file to encrypt.
  *
- * @return bool
+ * @return bool Whether the file was encrypted or not ( ie due to filesystem permissions ).
  * @throws \Exception
  */
 function encrypt_file( $filepath ) {
@@ -84,12 +87,13 @@ function encrypt_file( $filepath ) {
 }
 
 /**
- * Encrypt uploaded file
+ * Encrypt uploaded file through wp_handle_upload.
  *
- * @param $details
- * @param $upload_type
+ * @param array  $details     Array of file details
+ * @param string $upload_type Whether this is an 'upload', 'sideload', or other
  *
  * @return mixed
+ * @throws \Exception
  */
 function encrypt_uploaded_file( $details, $upload_type ) {
 
@@ -108,16 +112,18 @@ function encrypt_uploaded_file( $details, $upload_type ) {
 	}
 
 	$ext_info = wp_check_filetype( $details['file'] );
+	$ext      = pathinfo( $details['file'], PATHINFO_EXTENSION );
 
 	/**
-	 * Filter whether we should encrypt this type of files / specific file or not
+	 * Filter whether we should encrypt this type of files / specific file or not.
 	 *
-	 * @param $mime_type
-	 * @param $file_path
+	 * @param string $mime_type Detected mime type of the file
+	 * @param string $extension File extension
+	 * @param string $file_path Path to the file
 	 *
-	 * @return bool
+	 * @return bool Whether to allow encryption or not
 	 */
-	if ( ! apply_filters( 'encrypted_uploads_should_encrypt', true, $ext_info['type'], $details['file'] ) ) {
+	if ( ! apply_filters( 'encrypted_uploads_should_encrypt', true, $ext_info['type'], $ext, $details['file'] ) ) {
 		$details['error'] = esc_html__( 'Could not encrypt the file, possibly because of filesystem permissions.', 'encrypted-uploads' );
 
 		return $details;
@@ -148,12 +154,12 @@ function encrypt_uploaded_file( $details, $upload_type ) {
 add_filter( 'wp_handle_upload', __NAMESPACE__ . '\\encrypt_uploaded_file', 1, 2 );
 
 /**
- * Serve the decrypted file via the decrypt endpoint
+ * Serve the decrypted file via the decrypt endpoint.
  *
- * @param $url
- * @param $post_id
+ * @param string $url     URL to the attachment file
+ * @param int    $post_id Post ID of the attachment
  *
- * @return string
+ * @return string Decryption URL of the passed attachment ID
  */
 function decoded_upload_url( $url, $post_id ) {
 	global $wp_query;
@@ -175,7 +181,7 @@ function decoded_upload_url( $url, $post_id ) {
 add_filter( 'wp_get_attachment_url', __NAMESPACE__ . '\\decoded_upload_url', 20, 2 );
 
 /**
- * Register the decryption endpoint
+ * Register the decryption endpoint.
  *
  * @action init
  */
@@ -186,7 +192,7 @@ function rewrite_endpoint() {
 add_action( 'init', __NAMESPACE__ . '\\rewrite_endpoint' );
 
 /**
- * Serve the decrypted files through our custom endpoint
+ * Serve the decrypted files through our custom endpoint.
  *
  * @action template_redirect
  */
@@ -200,11 +206,11 @@ function serve_decrypted_file() {
 	$post_id = absint( openssl_decrypt( $wp_query->query_vars[ ENCRYPTED_UPLOADS_ENDPOINT ], ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY ) );
 
 	/**
-	 * Filter the capability used to check whether the current user can download/decrypt the file
+	 * Filter the capability used to check whether the current user can download/decrypt the file.
 	 *
-	 * @param $post_id
+	 * @param int $post_id Attachment post ID
 	 *
-	 * @return string
+	 * @return string Capability to check for
 	 */
 	$cap = apply_filters( 'encrypted_uploads_view_cap', 'edit_post' );
 	if ( ! current_user_can( $cap, $post_id ) ) {
@@ -239,7 +245,7 @@ function serve_decrypted_file() {
 add_action( 'template_redirect', __NAMESPACE__ . '\\serve_decrypted_file' );
 
 /**
- * Flush rewrite rules, used on plugin activation hook
+ * Flush rewrite rules, used on plugin activation hook.
  */
 function refresh_rewrite_rules() {
 	flush_rewrite_rules();
