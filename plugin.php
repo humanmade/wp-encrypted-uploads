@@ -21,3 +21,5 @@ if ( ! defined( 'ENCRYPTED_UPLOADS_ENDPOINT' ) ) {
 };
 
 require_once __DIR__ . '/namespace.php';
+
+register_activation_hook( __FILE__, __NAMESPACE__ . '\\refresh_rewrite_rules' );

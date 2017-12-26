@@ -237,3 +237,11 @@ function serve_decrypted_file() {
 }
 
 add_action( 'template_redirect', __NAMESPACE__ . '\\serve_decrypted_file' );
+
+/**
+ * Flush rewrite rules, used on plugin activation hook
+ */
+function refresh_rewrite_rules() {
+	flush_rewrite_rules();
+	do_action( 'rri_flush_rules' );
+}
