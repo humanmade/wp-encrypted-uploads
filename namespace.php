@@ -1,10 +1,6 @@
 <?php
-/**
- * Plugin name: Encrypted Uploads
- * Description: Allow encryption of uploads with real-time decryption based on user capabilities
- * Author: Human Made Limited
- * Version: 0.1
- */
+
+namespace HM\EncryptedUploads;
 
 /**
  * Adds a checkbox in the upload window to encrypt the file being uploaded
