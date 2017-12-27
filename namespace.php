@@ -89,30 +89,28 @@ function encrypt_file( $filepath ) {
 /**
  * Encrypt uploaded file through wp_handle_upload.
  *
- * @param array  $details     Array of file details
- * @param string $upload_type Whether this is an 'upload', 'sideload', or other
+ * @param array  $file     Array of file details
  *
  * @return mixed
  * @throws \Exception
  */
-function encrypt_uploaded_file( $details, $upload_type ) {
+function encrypt_uploaded_file( $file ) {
 
 	if ( ! filter_input( INPUT_POST, 'encrypted' ) ) {
-		return $details;
+		return $file;
 	}
 
-	if ( 'upload' !== $upload_type ) {
-		return $details;
+	$file_path = $file['tmp_name'];
+	$file_name = $file['name'];
+
+	if ( ! file_exists( $file_path ) ) {
+		$file['error'] = esc_html__( 'The specified local upload file does not exist.', 'encrypted-uploads' );
+
+		return $file;
 	}
 
-	if ( ! file_exists( $details['file'] ) ) {
-		$details['error'] = esc_html__( 'The specified local upload file does not exist.', 'encrypted-uploads' );
-
-		return $details;
-	}
-
-	$ext_info = wp_check_filetype( $details['file'] );
-	$ext      = pathinfo( $details['file'], PATHINFO_EXTENSION );
+	$ext_info = wp_check_filetype( $file_name );
+	$ext      = pathinfo( $file_name, PATHINFO_EXTENSION );
 
 	/**
 	 * Filter whether we should encrypt this type of files / specific file or not.
@@ -123,35 +121,38 @@ function encrypt_uploaded_file( $details, $upload_type ) {
 	 *
 	 * @return bool Whether to allow encryption or not
 	 */
-	if ( ! apply_filters( 'encrypted_uploads_should_encrypt', true, $ext_info['type'], $ext, $details['file'] ) ) {
-		$details['error'] = esc_html__( 'Encryption of this file has been disabled by site administrator.', 'encrypted-uploads' );
+	if ( ! apply_filters( 'encrypted_uploads_should_encrypt', true, $ext_info['type'], $ext, $file_name, $file_path ) ) {
+		$file['error'] = esc_html__( 'Encryption of this file has been disabled by site administrator.', 'encrypted-uploads' );
 
-		return $details;
+		return false;
 	}
 
 	try {
-		$encrypted = encrypt_file( $details['file'] );
+		$encrypted = encrypt_file( $file_path );
 
 		if ( ! $encrypted ) {
-			$details['error'] = esc_html__( 'Could not encrypt the file, possibly because of filesystem permissions.', 'encrypted-uploads' );
+			$file['error'] = esc_html__( 'Could not encrypt the file, possibly because of filesystem permissions.', 'encrypted-uploads' );
 
-			return $details;
+			return $file;
 		}
 	} catch ( Exception $e ) {
-		$details['error'] = $e->getMessage();
+		$file['error'] = $e->getMessage();
 
-		return $details;
+		return $file;
 	}
 
-	add_action( 'add_attachment', $fn = function ( $post_id ) use ( $details, $fn ) {
+	add_action( 'add_attachment', $fn = function ( $post_id ) use ( $file_name, $fn ) {
+		if ( get_post( $post_id )->post_title !== $file_name ) {
+			return;
+		}
 		add_post_meta( $post_id, 'encrypted-upload', openssl_encrypt( $post_id, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY ) );
 		remove_action( 'add_attachment', $fn );
 	} );
 
-	return $details;
+	return $file;
 }
 
-add_filter( 'wp_handle_upload', __NAMESPACE__ . '\\encrypt_uploaded_file', 1, 2 );
+add_filter( 'wp_handle_upload_prefilter', __NAMESPACE__ . '\\encrypt_uploaded_file', 1 );
 
 /**
  * Serve the decrypted file via the decrypt endpoint.
