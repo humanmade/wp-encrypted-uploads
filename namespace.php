@@ -72,7 +72,7 @@ function encrypt_file( $filepath ) {
 		throw new Exception( esc_html__( 'openssl_encrypt function does not exist, cannot proceed with encryption' ) );
 	}
 
-	$encrypted = openssl_encrypt( $contents, 'AES128', ENCRYPTED_UPLOADS_CIPHER_KEY );
+	$encrypted = openssl_encrypt( $contents, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY );
 
 	$fp = fopen( $filepath, 'w+' ); // @codingStandardsIgnoreLine
 
