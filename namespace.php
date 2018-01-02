@@ -60,7 +60,7 @@ add_action( 'wp_enqueue_media', __NAMESPACE__ . '\\encrypted_footer_script', 99 
  * @return bool Whether the file was encrypted or not ( ie due to filesystem permissions ).
  * @throws \Exception
  */
-function encrypt_file( $filepath, $filename ) {
+function encrypt_file( $filepath ) {
 
 	$contents = file_get_contents( $filepath ); // @codingStandardsIgnoreLine
 
@@ -72,7 +72,7 @@ function encrypt_file( $filepath, $filename ) {
 		throw new Exception( esc_html__( 'openssl_encrypt function does not exist, cannot proceed with encryption' ) );
 	}
 
-	$encrypted = openssl_encrypt( $contents, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, OPENSSL_RAW_DATA, $filename );
+	$encrypted = openssl_encrypt( $contents, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, OPENSSL_RAW_DATA, SECURE_AUTH_SALT );
 
 	$fp = fopen( $filepath, 'w+' ); // @codingStandardsIgnoreLine
 
@@ -128,7 +128,7 @@ function encrypt_uploaded_file( $file ) {
 	}
 
 	try {
-		$encrypted = encrypt_file( $file_path, $file_name );
+		$encrypted = encrypt_file( $file_path );
 
 		if ( ! $encrypted ) {
 			$file['error'] = esc_html__( 'Could not encrypt the file, possibly because of filesystem permissions.', 'encrypted-uploads' );
@@ -145,7 +145,7 @@ function encrypt_uploaded_file( $file ) {
 		if ( get_post( $post_id )->post_title !== $file_name ) {
 			return;
 		}
-		add_post_meta( $post_id, 'encrypted-upload', openssl_encrypt( $post_id, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, 0, 'encrypted-uploads' ) );
+		add_post_meta( $post_id, 'encrypted-upload', openssl_encrypt( $post_id, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, 0, SECURE_AUTH_SALT ) );
 		remove_action( 'add_attachment', $fn );
 	} );
 
@@ -204,7 +204,7 @@ function serve_decrypted_file() {
 		return;
 	}
 
-	$post_id = absint( openssl_decrypt( $wp_query->query_vars[ ENCRYPTED_UPLOADS_ENDPOINT ], ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, 0, 'encrypted-uploads' ) );
+	$post_id = absint( openssl_decrypt( $wp_query->query_vars[ ENCRYPTED_UPLOADS_ENDPOINT ], ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, 0, SECURE_AUTH_SALT ) );
 
 	/**
 	 * Filter the capability used to check whether the current user can download/decrypt the file.
@@ -239,7 +239,7 @@ function serve_decrypted_file() {
 	header( sprintf( 'Content-Type: %s; charset=utf-8', $ext_info['type'] ?: 'application/binary' ) );
 	header( sprintf( 'Content-Disposition: filename=%s', get_post( $post_id )->post_title . '.' . $ext ) );
 
-	echo openssl_decrypt( $content, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, OPENSSL_RAW_DATA, get_post( $post_id )->post_title ); // WPCS: xss ok
+	echo openssl_decrypt( $content, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, OPENSSL_RAW_DATA, SECURE_AUTH_SALT ); // WPCS: xss ok
 	exit;
 }
 
