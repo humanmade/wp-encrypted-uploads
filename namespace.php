@@ -57,7 +57,7 @@ add_action( 'wp_enqueue_media', __NAMESPACE__ . '\\encrypted_footer_script', 99 
  *
  * @param string $filepath Path to the file to encrypt.
  *
- * @return bool Whether the file was encrypted or not ( ie due to filesystem permissions ).
+ * @return bool Whether the file was encrypted or not
  * @throws \Exception
  */
 function encrypt_file( $filepath ) {
@@ -69,10 +69,22 @@ function encrypt_file( $filepath ) {
 	}
 
 	if ( ! function_exists( 'openssl_encrypt' ) ) {
-		throw new Exception( esc_html__( 'openssl_encrypt function does not exist, cannot proceed with encryption' ) );
+		throw new Exception( esc_html__( 'openssl_encrypt function does not exist, cannot proceed with encryption', 'encrypted-uploads' ) );
 	}
 
-	$encrypted = openssl_encrypt( $contents, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, OPENSSL_RAW_DATA, SECURE_AUTH_SALT );
+	$iv_size = openssl_cipher_iv_length( ENCRYPTED_UPLOADS_CIPHER_METHOD );
+
+	if ( false === $iv_size ) {
+		throw new \Exception( esc_html__( 'Unsupported cipher method specified.', 'encrypted-uploads' ) );
+	}
+
+	$iv = openssl_random_pseudo_bytes( $iv_size );
+
+	if ( false === $iv ) {
+		throw new \Exception( esc_html__( 'Unsupported cipher method specified.', 'encrypted-uploads' ) );
+	}
+
+	$encrypted = openssl_encrypt( $contents, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, OPENSSL_RAW_DATA, $iv );
 
 	$fp = fopen( $filepath, 'w+' ); // @codingStandardsIgnoreLine
 
@@ -80,10 +92,28 @@ function encrypt_file( $filepath ) {
 		return false;
 	}
 
-	fwrite( $fp, $encrypted ); // @codingStandardsIgnoreLine
+	$iv_salt = get_site_iv_salt();
+
+	fwrite( $fp, $iv . $iv_salt . $encrypted ); // @codingStandardsIgnoreLine
 	fclose( $fp );
 
 	return true;
+}
+
+/**
+ * Get site-specific randomly-generated IV salt
+ *
+ * @return mixed|string|void
+ */
+function get_site_iv_salt() {
+	$random_iv_salt = get_option( 'encrypted-uploads-random-iv-salt' );
+
+	if ( empty( $random_iv_salt ) ) {
+		$random_iv_salt = openssl_random_pseudo_bytes( rand( 1, 20 ) );
+		update_option( 'encrypted-uploads-random-iv-salt', $random_iv_salt );
+	}
+
+	return $random_iv_salt;
 }
 
 /**
@@ -141,13 +171,30 @@ function encrypt_uploaded_file( $file ) {
 		return $file;
 	}
 
+	// Mark the file as encrypted via meta data
 	add_action( 'add_attachment', $fn = function ( $post_id ) use ( $file_name, $fn ) {
-		if ( get_post( $post_id )->post_title !== $file_name ) {
+		$base_filename = pathinfo( $file_name, PATHINFO_FILENAME );
+		if ( get_post( $post_id )->post_title !== $base_filename ) {
 			return;
 		}
 		add_post_meta( $post_id, 'encrypted-upload', openssl_encrypt( $post_id, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, 0, SECURE_AUTH_SALT ) );
 		remove_action( 'add_attachment', $fn );
 	} );
+
+	// Skip deep file type detection as the file is encoded
+	add_filter( 'wp_check_filetype_and_ext', $fn2 = function( $args, $file, $filename, $mimes ) use ( $file_path ) {
+		if ( $file !== $file_path ) {
+			return $args;
+		}
+
+		$proper_filename = false;
+		$wp_filetype     = wp_check_filetype( $filename, $mimes );
+		$ext             = $wp_filetype['ext'];
+		$type            = $wp_filetype['type'];
+
+		remove_action( current_action(), $fn2 );
+		return compact( 'ext', 'type', 'proper_filename' );
+	}, 100, 4 );
 
 	return $file;
 }
@@ -239,7 +286,13 @@ function serve_decrypted_file() {
 	header( sprintf( 'Content-Type: %s; charset=utf-8', $ext_info['type'] ?: 'application/binary' ) );
 	header( sprintf( 'Content-Disposition: filename=%s', get_post( $post_id )->post_title . '.' . $ext ) );
 
-	echo openssl_decrypt( $content, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, OPENSSL_RAW_DATA, SECURE_AUTH_SALT ); // WPCS: xss ok
+	$iv_salt = get_site_iv_salt();
+	$iv_length = openssl_cipher_iv_length( ENCRYPTED_UPLOADS_CIPHER_METHOD );
+
+	$iv = substr( $content, 0, $iv_length );
+	$content = substr( $content, $iv_length + strlen( $iv_salt ) );
+
+	echo openssl_decrypt( $content, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, OPENSSL_RAW_DATA, $iv ); // WPCS: xss ok
 	exit;
 }
 
