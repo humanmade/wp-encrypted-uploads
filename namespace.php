@@ -109,7 +109,7 @@ function get_site_iv_salt() {
 	$random_iv_salt = get_option( 'encrypted-uploads-random-iv-salt' );
 
 	if ( empty( $random_iv_salt ) ) {
-		$random_iv_salt = openssl_random_pseudo_bytes( rand( 1, 20 ) );
+		$random_iv_salt = base64_encode( openssl_random_pseudo_bytes( rand( 1, 20 ) ) );
 		update_option( 'encrypted-uploads-random-iv-salt', $random_iv_salt );
 	}
 
