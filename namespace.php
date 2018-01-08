@@ -177,7 +177,7 @@ function encrypt_uploaded_file( $file ) {
 		if ( get_post( $post_id )->post_title !== $base_filename ) {
 			return;
 		}
-		add_post_meta( $post_id, 'encrypted-upload', openssl_encrypt( $post_id, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, 0, SECURE_AUTH_SALT ) );
+		add_post_meta( $post_id, 'encrypted-upload', base64_encode( openssl_encrypt( $post_id, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, 0, SECURE_AUTH_SALT ) ) );
 		remove_action( 'add_attachment', $fn );
 	} );
 
@@ -251,7 +251,7 @@ function serve_decrypted_file() {
 		return;
 	}
 
-	$post_id = absint( openssl_decrypt( $wp_query->query_vars[ ENCRYPTED_UPLOADS_ENDPOINT ], ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, 0, SECURE_AUTH_SALT ) );
+	$post_id = absint( openssl_decrypt( base64_decode( $wp_query->query_vars[ ENCRYPTED_UPLOADS_ENDPOINT ] ), ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, 0, SECURE_AUTH_SALT ) );
 
 	/**
 	 * Filter the capability used to check whether the current user can download/decrypt the file.
