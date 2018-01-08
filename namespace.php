@@ -285,6 +285,7 @@ function serve_decrypted_file() {
 	$ext_info = wp_check_filetype( $filename );
 	header( sprintf( 'Content-Type: %s; charset=utf-8', $ext_info['type'] ?: 'application/binary' ) );
 	header( sprintf( 'Content-Disposition: filename=%s', get_post( $post_id )->post_title . '.' . $ext ) );
+	nocache_headers();
 
 	$iv_salt = get_site_iv_salt();
 	$iv_length = openssl_cipher_iv_length( ENCRYPTED_UPLOADS_CIPHER_METHOD );
