@@ -280,19 +280,17 @@ function serve_decrypted_file() {
 		}
 	}
 
-	$filename = pathinfo( $url, PATHINFO_BASENAME );
-	$ext      = pathinfo( $url, PATHINFO_EXTENSION );
-	$ext_info = wp_check_filetype( $filename );
+	$filename  = pathinfo( $url, PATHINFO_BASENAME );
+	$ext       = pathinfo( $url, PATHINFO_EXTENSION );
+	$ext_info  = wp_check_filetype( $filename );
+	$iv_salt   = get_site_iv_salt();
+	$iv_length = openssl_cipher_iv_length( ENCRYPTED_UPLOADS_CIPHER_METHOD );
+	$iv        = substr( $content, 0, $iv_length );
+	$content   = substr( $content, $iv_length + strlen( $iv_salt ) );
+
 	header( sprintf( 'Content-Type: %s; charset=utf-8', $ext_info['type'] ?: 'application/binary' ) );
 	header( sprintf( 'Content-Disposition: filename=%s', get_post( $post_id )->post_title . '.' . $ext ) );
 	nocache_headers();
-
-	$iv_salt = get_site_iv_salt();
-	$iv_length = openssl_cipher_iv_length( ENCRYPTED_UPLOADS_CIPHER_METHOD );
-
-	$iv = substr( $content, 0, $iv_length );
-	$content = substr( $content, $iv_length + strlen( $iv_salt ) );
-
 	echo openssl_decrypt( $content, ENCRYPTED_UPLOADS_CIPHER_METHOD, ENCRYPTED_UPLOADS_CIPHER_KEY, OPENSSL_RAW_DATA, $iv ); // WPCS: xss ok
 	exit;
 }
