@@ -126,7 +126,7 @@ function get_site_iv_salt() {
  */
 function encrypt_uploaded_file( $file ) {
 
-	if ( ! filter_input( INPUT_POST, 'encrypted' ) ) {
+	if ( ! filter_input( INPUT_POST, 'encrypted', FILTER_VALIDATE_BOOLEAN ) ) {
 		return $file;
 	}
 
